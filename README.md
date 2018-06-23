@@ -12,6 +12,8 @@ https://support.discordapp.com/hc/en-us/articles/360004027692-Requesting-a-Copy-
 
 ## Usage
 
+This script is tested with Postgres 10 only.
+
 This script uses psycopg2 to connect to the Postgres database. Install
 dependencies with `pip`:
 
