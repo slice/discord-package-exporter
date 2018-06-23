@@ -2,19 +2,20 @@ import csv
 import datetime
 import json
 import re
-import sys
 from pathlib import Path
 
 import psycopg2
 
 __all__ = ['Exporter']
 
+# a regex that targets the .000000+00:00 part of a date string provided in
+# messages.csv (the .000000 part is optional)
 STRIP_DATE_REGEX = re.compile(r'(\.\d{6})?\+00:00')
 
 
 class Exporter:
 
-    def __init__(self, package_path: Path, dsn: str):
+    def __init__(self, package_path, dsn):
         self.package_path = package_path
         self.dsn = dsn
         self.conn = psycopg2.connect(dsn)
@@ -28,11 +29,15 @@ class Exporter:
         return self.package_path / 'messages'
 
     def process_message(self, row):
-        r_id, r_isodate, r_content, _ = row
-        r_date = datetime.datetime.strptime(
-            STRIP_DATE_REGEX.sub('', r_isodate), '%Y-%m-%d %H:%M:%S'
-        )
-        return r_id, r_date, r_content
+        message_id, raw_date, message_content, _ = row
+
+        # remove the microseconds (.000000) and utc offset (+00:00) from the
+        # date string using a regex, as python's strptime cannot process these
+        cleansed_date = STRIP_DATE_REGEX.sub('', raw_date)
+
+        date = datetime.datetime.strptime(cleansed_date, '%Y-%m-%d %H:%M:%S')
+
+        return message_id, date, message_content
 
     def load_index(self):
         with open(self.messages / 'index.json') as fp:
@@ -59,7 +64,9 @@ class Exporter:
     def insert_message(self, *, channel, message):
         m_id, date, content = message
 
-        recipients = channel.get('recipients', None)
+        recipients = channel.get('recipients', None)  # group dms
+
+        # extract guild information from channel.json, if any.
         guild = channel.get('guild', {})
         guild_id = guild.get('id', None)
         guild_name = guild.get('name', None)
@@ -104,22 +111,37 @@ class Exporter:
 
             with open(channel_path / 'channel.json') as fp:
                 channel = json.load(fp)
+
+                # channel objects in channel.json don't have name fields, but
+                # index.json does, so let's grab the name (if any) from
+                # index.json and shove it in the channel.
                 channel['name'] = self.index.get(str(channel['id']), None)
 
             with open(channel_path / 'messages.csv') as fp:
                 reader = csv.reader(fp, delimiter=',')
+
+                # ignore the first row of messages.csv which describes each
+                # column
                 rows = filter(lambda r: r[0] != 'ID', reader)
+
+                # 'process' each row. all this really does is parse the date
+                # by removing some cruft and passing it into strptime, which
+                # converts strings into actual date objects
                 messages = list(map(self.process_message, rows))
+
                 total = len(messages)
 
                 for (index, message) in enumerate(messages):
                     print(
-                        '>> Exporting C#{} ({}/{}){}'.format(
+                        '\r>> Exporting C#{} ({}/{}){}'.format(
                             channel_path.name, index, total, ' ' * 10
-                        ), end='\r'
+                        ), end=''
                     )
+
                     self.insert_message(channel=channel, message=message)
 
+            # we're done with this channel, let's commit any changes to the
+            # database
             self.conn.commit()
 
     def close(self):
@@ -128,11 +150,17 @@ class Exporter:
 
 
 if __name__ == '__main__':
+    import sys
+
     _, raw_path, dsn = sys.argv
     path = Path(raw_path).resolve()
 
     exporter = Exporter(path, dsn)
+
+    # let's create the necessary tables
     exporter.prepare()
+
     exporter.export()
     exporter.close()
+
     print('All done!')
