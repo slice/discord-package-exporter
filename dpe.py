@@ -79,7 +79,8 @@ class Exporter:
                     %(recipients)s,
                     %(id)s, %(date)s, %(content)s
                 )
-                ON CONFLICT DO NOTHING
+                ON CONFLICT (id) DO UPDATE SET
+                    channel_name = EXCLUDED.channel_name
             ''',
             {
                 'channel_id': channel['id'],
