@@ -103,7 +103,7 @@ class Exporter:
 
             with open(channel_path / 'channel.json') as fp:
                 channel = json.load(fp)
-                channel['name'] = self.index.get(channel['id'], None)
+                channel['name'] = self.index.get(str(channel['id']), None)
 
             with open(channel_path / 'messages.csv') as fp:
                 reader = csv.reader(fp, delimiter=',')
