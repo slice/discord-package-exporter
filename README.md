@@ -33,7 +33,7 @@ $ createdb discord
 Once you have created the database, run the script:
 
 ```sh
-$ python3 dpe.py "$HOME/discord-data-package" "dbname=discord user=joe"
+$ python3 dpe.py "$HOME/discord-data-package" "dbname=discord user=postgres"
 ```
 
 Like mentioned earlier, required tables will be created if they don't already
