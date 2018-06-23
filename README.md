@@ -2,7 +2,8 @@
 
 This repository houses a Python 3 script that will export all messages from
 your [Discord data package][ddp] into a [Postgresql][postgres] database.
-Instructions showing the process of obtaining your data package are [here][ob].
+Instructions showing the process of obtaining your data package are available
+[here][ob].
 
 [postgres]: https://www.postgresql.org/
 [ob]:
@@ -11,8 +12,8 @@ https://support.discordapp.com/hc/en-us/articles/360004027692-Requesting-a-Copy-
 
 ## Usage
 
-This script uses psycopg2 to connect to the database. Install dependencies
-with `pip`:
+This script uses psycopg2 to connect to the Postgres database. Install
+dependencies with `pip`:
 
 ```sh
 $ pip3 install -U -r requirements.txt
@@ -35,10 +36,13 @@ Once you have created the database, run the script:
 $ python3 dpe.py "$HOME/discord-data-package" "dbname=discord user=joe"
 ```
 
+Like mentioned earlier, required tables will be created if they don't already
+exist.
+
 The first argument is a path to your Discord data package, while the second
 argument is a [psycopg2 DSN (connection string)][connstr].
 
 [connstr]: https://www.postgresql.org/docs/current/static/libpq-connect.html#LIBPQ-CONNSTRING
 
-This process can take a few minutes, depending on multiple factors. Progress
-will be shown in your terminal while data moves through the tubes.
+This process can take a few minutes. Progress will be shown in your terminal
+while data is transferred.
