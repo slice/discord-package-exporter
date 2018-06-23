@@ -29,7 +29,7 @@ class Exporter:
         return self.package_path / 'messages'
 
     def process_message(self, row):
-        message_id, raw_date, message_content, _ = row
+        message_id, raw_date, message_content, attachments = row
 
         # remove the microseconds (.000000) and utc offset (+00:00) from the
         # date string using a regex, as python's strptime cannot process these
@@ -37,7 +37,7 @@ class Exporter:
 
         date = datetime.datetime.strptime(cleansed_date, '%Y-%m-%d %H:%M:%S')
 
-        return message_id, date, message_content
+        return message_id, date, message_content, attachments
 
     def load_index(self):
         with open(self.messages / 'index.json') as fp:
@@ -55,14 +55,22 @@ class Exporter:
                     recipients BIGINT[],
                     id BIGINT PRIMARY KEY,
                     date TIMESTAMP WITHOUT TIME ZONE,
-                    content TEXT
+                    content TEXT,
+                    attachments TEXT
                 )
+            '''
+        )
+
+        # migrations:
+        self.cur.execute(
+            '''
+                ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachments TEXT
             '''
         )
         self.conn.commit()
 
     def insert_message(self, *, channel, message):
-        m_id, date, content = message
+        message_id, date, content, attachments = message
 
         recipients = channel.get('recipients', None)  # group dms
 
@@ -78,16 +86,17 @@ class Exporter:
                     channel_id, channel_type, channel_name,
                     guild_id, guild_name,
                     recipients,
-                    id, date, content
+                    id, date, content, attachments
                 )
                 VALUES (
                     %(channel_id)s, %(channel_type)s, %(channel_name)s,
                     %(guild_id)s, %(guild_name)s,
                     %(recipients)s,
-                    %(id)s, %(date)s, %(content)s
+                    %(id)s, %(date)s, %(content)s, %(attachments)s
                 )
                 ON CONFLICT (id) DO UPDATE SET
-                    channel_name = EXCLUDED.channel_name
+                    channel_name = EXCLUDED.channel_name,
+                    attachments = EXCLUDED.attachments
             ''',
             {
                 'channel_id': channel['id'],
@@ -96,9 +105,10 @@ class Exporter:
                 'guild_id': guild_id,
                 'guild_name': guild_name,
                 'recipients': recipients,
-                'id': m_id,
+                'id': message_id,
                 'date': date,
                 'content': content,
+                'attachments': attachments,
             }
         )
 
